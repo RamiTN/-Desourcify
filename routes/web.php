@@ -109,30 +109,34 @@ Route::middleware(['auth', 'admin'])->group(function () {
 });
 
 // API routes (public proxies for Pexels & Pixabay)
-Route::get('/api/pexels/{query?}', function ($query = 'nature') {
+// API routes (public proxies for Pexels & Pixabay)
+Route::get('/pexels/{query?}', function ($query = 'nature') {
     $apiKey = env('PEXELS_API_KEY');
     if (!$apiKey) return response()->json(['error' => 'API key not configured'], 500);
 
     $query = preg_replace('/[^a-zA-Z0-9\s-]/', '', $query);
 
     $response = Http::withHeaders(['Authorization' => $apiKey])
-        ->get("https://api.pexels.com/v1/search", [
+        ->get("https://api.pexels.com/v1/search", [  // ← Fixed: added /search
             'query' => $query,
             'per_page' => 6
         ]);
 
     if ($response->successful()) return $response->json();
 
-    return response()->json(['error' => 'Failed to fetch images from Pexels', 'status' => $response->status()], 500);
+    return response()->json([
+        'error' => 'Failed to fetch images from Pexels', 
+        'status' => $response->status()
+    ], 500);
 })->middleware('throttle:60,1');
 
-Route::get('/api/pixabay/{query?}', function ($query = 'nature') {
+Route::get('/pixabay/{query?}', function ($query = 'nature') {
     $apiKey = env('PIXABAY_API_KEY');
     if (!$apiKey) return response()->json(['error' => 'Pixabay API key not configured'], 500);
 
     $query = preg_replace('/[^a-zA-Z0-9\s-]/', '', $query);
 
-    $response = Http::get("https://pixabay.com/api/", [
+    $response = Http::get("https://pixabay.com/api/", [  // ← Fixed: removed /docs/
         'key' => $apiKey,
         'q' => $query,
         'image_type' => 'photo',
@@ -142,7 +146,10 @@ Route::get('/api/pixabay/{query?}', function ($query = 'nature') {
 
     if ($response->successful()) return $response->json();
 
-    return response()->json(['error' => 'Failed to fetch images from Pixabay', 'status' => $response->status()], 500);
+    return response()->json([
+        'error' => 'Failed to fetch images from Pixabay', 
+        'status' => $response->status()
+    ], 500);
 })->middleware('throttle:60,1');
 
 require __DIR__.'/auth.php';

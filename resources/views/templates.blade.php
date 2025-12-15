@@ -1,17 +1,22 @@
 <x-app-layout>
-
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Toast CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <!-- Toast JS -->
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+            <div class="relative bg-white border border-gray-300 rounded-lg p-6 shadow-sm">
                 <!-- Header -->
-                <div class="flex justify-between tems-center mb-6">
+                <div class="flex justify-between items-center mb-6">
                     <div>
                         <h1 class="text-3xl font-bold text-gray-800">Welcome back, {{ auth()->user()->name }}!</h1>
                         <p class="mt-2 text-gray-700">You have <strong id="credits-display" class="text-blue-600">{{ auth()->user()->credits }}</strong> credits left.</p>
                         <p class="text-sm text-gray-500 mt-1">Each download costs 1 credit</p>
+                        <p class="text-sm text-gray-600 mt-2" id="results-count">Loading images...</p>
                     </div>
                     <button id="clearFilters" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition hidden">
                         Clear Filters
@@ -30,7 +35,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-2">Categories</label>
                         <div class="flex flex-wrap gap-3">
                             @php
-                                $categories = ['Nature', 'Technology', 'People', 'Animals', 'Food', 'Travel', 'Sports', 'Fashion', 'Business', 'Music'];
+                                $categories = ['Nature', 'Technology', 'People', 'Animals', 'Food', 'Travel', 'Sports', 'Fashion', 'Business', 'Music', 'Cars', 'Architecture', 'Art', 'Beaches', 'Mountains', 'Flowers', 'Cities', 'Space', 'Underwater'];
                             @endphp
 
                             @foreach ($categories as $category)
@@ -44,7 +49,7 @@
                 </div>
 
                 <!-- Images container -->
-                <div id="media-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div id="media-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-12">
                     <div class="col-span-full text-center py-12" id="loading-indicator">
                         <svg class="animate-spin h-10 w-10 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -54,13 +59,12 @@
                     </div>
                 </div>
 
-                <!-- Load More Button -->
-                <div class="mt-8 text-center hidden" id="load-more-container">
-                    <button id="loadMoreBtn" class="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium">
+                <!-- Load More Button - Positioned at bottom border center -->
+                <div class="absolute left-1/2 -translate-x-1/2 -bottom-5 hidden" id="load-more-container">
+                    <button id="loadMoreBtn" class="px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-blue-500 hover:text-blue-600 transition font-medium shadow-md">
                         Load More Images
                     </button>
                 </div>
-
             </div>
         </div>
     </div>
@@ -70,8 +74,8 @@
         <div class="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
             <h3 class="text-xl font-bold text-gray-800 mb-4">Download Image</h3>
             <img id="modalImage" src="" alt="" class="w-full h-64 object-cover rounded-md mb-4">
-            <p class="text-gray-700 mb-2"><strong>Photographer:</strong> <span id="modalPhotographer"></span></p>
-            <p class="text-gray-700 mb-4"><strong>Cost:</strong> 1 credit</p>
+            <p class="text-gray-700 mb-2"><strong>📷 Photographer:</strong> <span id="modalPhotographer"></span></p>
+            <p class="text-gray-700 mb-4"><strong>💳 Cost:</strong> 1 credit</p>
             <div class="flex gap-3">
                 <button id="confirmDownload" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium">
                     Download
@@ -84,122 +88,222 @@
     </div>
 
     <script>
-        let allImages = [];
-        let displayedImages = [];
-        let currentPage = 0;
-        const imagesPerPage = 5;
+        let currentPage = 1;
+        let isLoading = false;
         let selectedImage = null;
+        let currentImages = [];
 
-        const categories = [
-            'backgrounds', 'fashion', 'nature', 'science', 'education', 
-            'feelings', 'health', 'people', 'religion', 'places', 
-            'animals', 'industry', 'computer', 'food', 'sports', 
-            'transportation', 'travel', 'buildings', 'business', 'music'
-        ];
+        const categoryMap = {
+            'nature': 'nature',
+            'technology': 'computer',
+            'people': 'people',
+            'animals': 'animals',
+            'food': 'food',
+            'travel': 'travel',
+            'sports': 'sports',
+            'fashion': 'fashion',
+            'business': 'business',
+            'music': 'music',
+            "cars": "cars",
+            "architecture": "architecture",
+            "art": "art",
+            "beaches": "beach",
+            "mountains": "mountain",
+            "flowers": "flowers",
+            "cities": "city",
+            "space": "space",
+            "underwater": "underwater"
+        };
 
-        // Load images from both Pexels and Pixabay APIs
-        async function loadImages() {
-            let images = [];
-            let loadedCount = 0;
-            const totalSources = categories.length * 2; // Both Pexels and Pixabay
-
-            // Load from Pexels
-            for (const cat of categories) {
-                try {
-                    const res = await fetch(`/api/pexels/${cat}`);
-                    const data = await res.json();
-                    if (data.photos) {
-                        images.push(...data.photos.map(photo => ({ 
-                            ...photo, 
-                            category: cat,
-                            alt: photo.alt || 'Image',
-                            source: 'pexels'
-                        })));
-                    }
-                    loadedCount++;
-                    updateLoadingProgress(loadedCount, totalSources);
-                } catch (err) {
-                    console.error(`Failed to load Pexels ${cat}:`, err);
-                    loadedCount++;
-                    updateLoadingProgress(loadedCount, totalSources);
+        // Toast notification helper
+        function showToast(message, type = 'success') {
+            const bgColor = type === 'success' ? 'linear-gradient(to right, #00b09b, #96c93d)' : 
+                           type === 'error' ? 'linear-gradient(to right, #ff5f6d, #ffc371)' :
+                           'linear-gradient(to right, #4facfe, #00f2fe)';
+            
+            Toastify({
+                text: message,
+                duration: 3000,
+                gravity: "top",
+                position: "right",
+                stopOnFocus: true,
+                style: {
+                    background: bgColor,
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    fontWeight: "500"
                 }
-            }
-
-            // Load from Pixabay
-            for (const cat of categories) {
-                try {
-                    const res = await fetch(`/api/pixabay/${cat}`);
-                    const data = await res.json();
-                    if (data.hits) {
-                        images.push(...data.hits.map(photo => ({ 
-                            id: photo.id,
-                            photographer: photo.user,
-                            src: {
-                                original: photo.largeImageURL,
-                                large: photo.webformatURL,
-                                medium: photo.webformatURL
-                            },
-                            category: cat,
-                            alt: photo.tags || 'Image',
-                            source: 'pixabay'
-                        })));
-                    }
-                    loadedCount++;
-                    updateLoadingProgress(loadedCount, totalSources);
-                } catch (err) {
-                    console.error(`Failed to load Pixabay ${cat}:`, err);
-                    loadedCount++;
-                    updateLoadingProgress(loadedCount, totalSources);
-                }
-            }
-
-            // Shuffle images for variety
-            allImages = images.sort(() => Math.random() - 0.5);
-            displayImages(allImages);
-            updateResultsCount(allImages.length);
+            }).showToast();
         }
 
-        function updateLoadingProgress(loaded, total) {
-            const indicator = document.getElementById('loading-indicator');
-            indicator.innerHTML = `
-                <svg class="animate-spin h-10 w-10 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <p class="mt-3 text-gray-600 font-medium">Loading images... (${loaded}/${total})</p>
-            `;
+        async function loadImages(append = false) {
+            if (isLoading) return;
+            isLoading = true;
+
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+            const checkedCategories = Array.from(document.querySelectorAll('.category-checkbox:checked'))
+                .map(cb => cb.value);
+
+            try {
+                if (!append) {
+                    document.getElementById('media-container').innerHTML = `
+                        <div class="col-span-full text-center py-12">
+                            <svg class="animate-spin h-10 w-10 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p class="mt-3 text-gray-600 font-medium">Loading images...</p>
+                        </div>
+                    `;
+                }
+
+                let images = [];
+                
+                // Determine categories to fetch
+                let categoriesToFetch = checkedCategories.length > 0 
+                    ? checkedCategories.map(cat => categoryMap[cat] || cat)
+                    : Object.values(categoryMap);
+
+                // Randomize category selection for variety
+                const randomCategory = categoriesToFetch[Math.floor(Math.random() * categoriesToFetch.length)];
+
+                console.log('Fetching category:', randomCategory, 'page:', currentPage);
+
+                // Fetch from Pexels with error handling
+                try {
+                    const pexelsUrl = `/pexels/${randomCategory}?page=${currentPage}`;
+                    console.log('Pexels URL:', pexelsUrl);
+                    const pexelsRes = await fetch(pexelsUrl);
+                    console.log('Pexels response status:', pexelsRes.status);
+                    
+                    if (pexelsRes.ok) {
+                        const pexelsData = await pexelsRes.json();
+                        console.log('Pexels data:', pexelsData);
+                        
+                        if (pexelsData.photos && Array.isArray(pexelsData.photos)) {
+                            images.push(...pexelsData.photos.slice(0, 10).map(photo => ({
+                                id: photo.id,
+                                photographer: photo.photographer,
+                                src: {
+                                    original: photo.src.original,
+                                    large: photo.src.large,
+                                    medium: photo.src.medium
+                                },
+                                category: randomCategory,
+                                alt: photo.alt || 'Image',
+                                source: 'pexels'
+                            })));
+                        }
+                    } else {
+                        console.error('Pexels API error:', pexelsRes.status, await pexelsRes.text());
+                    }
+                } catch (err) {
+                    console.error('Pexels API error:', err);
+                }
+
+                // Fetch from Pixabay with error handling
+                try {
+                    const pixabayUrl = `/pixabay/${randomCategory}?page=${currentPage}`;
+                    console.log('Pixabay URL:', pixabayUrl);
+                    const pixabayRes = await fetch(pixabayUrl);
+                    console.log('Pixabay response status:', pixabayRes.status);
+                    
+                    if (pixabayRes.ok) {
+                        const pixabayData = await pixabayRes.json();
+                        console.log('Pixabay data:', pixabayData);
+                        
+                        if (pixabayData.hits && Array.isArray(pixabayData.hits)) {
+                            images.push(...pixabayData.hits.slice(0, 10).map(photo => ({
+                                id: photo.id,
+                                photographer: photo.user,
+                                src: {
+                                    original: photo.largeImageURL,
+                                    large: photo.webformatURL,
+                                    medium: photo.webformatURL
+                                },
+                                category: randomCategory,
+                                alt: photo.tags || 'Image',
+                                source: 'pixabay'
+                            })));
+                        }
+                    } else {
+                        console.error('Pixabay API error:', pixabayRes.status, await pixabayRes.text());
+                    }
+                } catch (err) {
+                    console.error('Pixabay API error:', err);
+                }
+
+                console.log('Total images fetched:', images.length);
+
+                // Shuffle for variety
+                images = images.sort(() => Math.random() - 0.5);
+
+                // Apply search filter if exists
+                if (searchTerm) {
+                    images = images.filter(img => 
+                        img.alt.toLowerCase().includes(searchTerm) || 
+                        img.photographer.toLowerCase().includes(searchTerm)
+                    );
+                }
+
+                // Take only 20 images
+                images = images.slice(0, 20);
+
+                console.log('Images after filtering:', images.length);
+
+                if (append) {
+                    currentImages = [...currentImages, ...images];
+                } else {
+                    currentImages = images;
+                }
+
+                displayImages(images, append);
+
+            } catch (error) {
+                console.error('Error loading images:', error);
+                document.getElementById('media-container').innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <p class="text-red-500 text-lg">Error loading images. Please try again.</p>
+                        <p class="text-sm text-gray-600 mt-2">Check console for details</p>
+                    </div>
+                `;
+                showToast('Failed to load images', 'error');
+            } finally {
+                isLoading = false;
+            }
         }
 
         function displayImages(images, append = false) {
             const container = document.getElementById('media-container');
             
-            if (images.length === 0) {
+            if (images.length === 0 && !append) {
                 container.innerHTML = '<div class="col-span-full text-center py-12"><p class="text-gray-500 text-lg">No images found</p></div>';
                 document.getElementById('load-more-container').classList.add('hidden');
+                updateResultsCount(0);
                 return;
             }
 
-            displayedImages = images;
-            
-            if (!append) {
-                currentPage = 0;
-            }
-            
-            const start = currentPage * imagesPerPage;
-            const end = start + imagesPerPage;
-            const imagesToShow = images.slice(start, end);
-
             let html = '';
             
-            imagesToShow.forEach(photo => {
+            images.forEach(photo => {
                 const sourceColor = photo.source === 'pexels' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700';
+                
+                // Properly escape strings for HTML attributes
+                const photoData = {
+                    id: photo.id,
+                    source: photo.source,
+                    original: photo.src.original,
+                    large: photo.src.large,
+                    photographer: photo.photographer
+                };
+                
                 html += `
                     <div class="rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1 bg-white" 
-                         onclick="openDownloadModal(${photo.id}, '${photo.source}')">
-                        <img src="${photo.src.medium}" alt="${photo.alt}" class="w-full h-56 object-cover" loading="lazy">
+                         data-photo='${JSON.stringify(photoData).replace(/'/g, "&#39;")}' onclick="handleImageClick(this)">
+                        <img src="${photo.src.medium}" alt="${photo.alt.replace(/"/g, '&quot;')}" class="w-full h-56 object-cover" loading="lazy">
                         <div class="p-3">
-                            <p class="text-gray-800 font-medium text-sm truncate">${photo.photographer}</p>
-                            <p class="text-gray-500 text-xs mt-1 truncate">${photo.alt}</p>
+                            <p class="text-gray-800 font-medium text-sm truncate">${photo.photographer.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+                            <p class="text-gray-500 text-xs mt-1 truncate">${photo.alt.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
                             <div class="flex gap-2 mt-2">
                                 <span class="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">${photo.category}</span>
                                 <span class="inline-block px-2 py-1 ${sourceColor} text-xs rounded-full capitalize">${photo.source}</span>
@@ -215,41 +319,28 @@
                 container.innerHTML = html;
             }
 
-            // Update results count
-            updateResultsCount(images.length, end);
-
-            // Show/hide load more button
-            if (end < images.length) {
-                document.getElementById('load-more-container').classList.remove('hidden');
-            } else {
-                document.getElementById('load-more-container').classList.add('hidden');
-            }
+            updateResultsCount(currentImages.length);
+            document.getElementById('load-more-container').classList.remove('hidden');
         }
 
-        function updateResultsCount(total, displayed) {
-            const showing = Math.min(displayed, total);
-            document.getElementById('results-count').textContent = `Showing ${showing} of ${total} images`;
+        function handleImageClick(element) {
+            const photoData = JSON.parse(element.getAttribute('data-photo'));
+            openDownloadModal(photoData.id, photoData.source, photoData.original, photoData.large, photoData.photographer);
         }
 
-        function filtrage() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const checkedCategories = Array.from(document.querySelectorAll('.category-checkbox:checked'))
-                .map(cb => cb.value);
+        function updateResultsCount(count) {
+            document.getElementById('results-count').textContent = `Showing ${count} images`;
+        }
 
-            const filtered = allImages.filter(img => {
-                const matchesSearch = !searchTerm || 
-                    img.alt.toLowerCase().includes(searchTerm) || 
-                    img.photographer.toLowerCase().includes(searchTerm);
-                const matchesCategory = checkedCategories.length === 0 || 
-                    checkedCategories.includes(img.category);
-                return matchesSearch && matchesCategory;
-            });
+        function applyFilters() {
+            currentPage = 1;
+            currentImages = [];
+            loadImages(false);
 
-            displayImages(filtered);
-            updateResultsCount(filtered.length);
-
-            // Show/hide clear filters button
+            const searchTerm = document.getElementById('searchInput').value;
+            const checkedCategories = Array.from(document.querySelectorAll('.category-checkbox:checked'));
             const clearBtn = document.getElementById('clearFilters');
+            
             if (searchTerm || checkedCategories.length > 0) {
                 clearBtn.classList.remove('hidden');
             } else {
@@ -257,13 +348,25 @@
             }
         }
 
-        function openDownloadModal(photoId, source) {
-            const photo = allImages.find(img => img.id === photoId && img.source === source);
-            if (!photo) return;
+        let searchTimeout;
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(applyFilters, 500);
+        }
 
-            selectedImage = photo;
-            document.getElementById('modalImage').src = photo.src.large;
-            document.getElementById('modalPhotographer').textContent = photo.photographer;
+        function openDownloadModal(photoId, source, originalUrl, largeUrl, photographer) {
+            selectedImage = {
+                id: photoId,
+                source: source,
+                src: {
+                    original: originalUrl,
+                    large: largeUrl
+                },
+                photographer: photographer
+            };
+            
+            document.getElementById('modalImage').src = largeUrl;
+            document.getElementById('modalPhotographer').textContent = photographer;
             document.getElementById('downloadModal').classList.remove('hidden');
             document.getElementById('downloadModal').classList.add('flex');
         }
@@ -279,14 +382,13 @@
 
             const credits = parseInt(document.getElementById('credits-display').textContent);
             if (credits < 1) {
-                alert('Insufficient credits. Please purchase more credits to continue downloading.');
+                showToast('Insufficient credits. Please purchase more credits.', 'error');
                 closeDownloadModal();
                 return;
             }
 
             try {
-                // Make API call to download and deduct credit
-                const response = await fetch('/api/download', {
+                const response = await fetch('/api/download-image', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -295,56 +397,62 @@
                     body: JSON.stringify({
                         image_url: selectedImage.src.original,
                         photographer: selectedImage.photographer,
-                        image_id: selectedImage.id
+                        photo_id: selectedImage.id.toString(),
+                        source: selectedImage.source
                     })
                 });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
 
                 const data = await response.json();
 
                 if (data.success) {
-                    // Update credits display
                     document.getElementById('credits-display').textContent = data.remaining_credits;
                     
-                    // Download the image
+                    // Download directly without opening new tab
                     const link = document.createElement('a');
                     link.href = selectedImage.src.original;
                     link.download = `${selectedImage.photographer}-${selectedImage.id}.jpg`;
-                    link.target = '_blank';
+                    link.style.display = 'none';
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
 
+                    showToast('Download Successful! 🎉', 'success');
                     closeDownloadModal();
                 } else {
-                    alert(data.message || 'Download failed. Please try again.');
+                    showToast(data.error || 'Download failed. Please try again.', 'error');
                 }
             } catch (error) {
                 console.error('Download error:', error);
-                alert('An error occurred during download. Please try again.');
+                showToast('An error occurred: ' + error.message, 'error');
             }
         }
 
         // Event listeners
-        document.getElementById('searchInput').addEventListener('input', filtrage);
+        document.getElementById('searchInput').addEventListener('input', debounceSearch);
+        
         document.querySelectorAll('.category-checkbox').forEach(cb => {
-            cb.addEventListener('change', filtrage);
+            cb.addEventListener('change', applyFilters);
         });
 
         document.getElementById('clearFilters').addEventListener('click', () => {
             document.getElementById('searchInput').value = '';
             document.querySelectorAll('.category-checkbox').forEach(cb => cb.checked = false);
-            filtrage();
+            applyFilters();
         });
 
         document.getElementById('loadMoreBtn').addEventListener('click', () => {
             currentPage++;
-            displayImages(displayedImages, true);
+            loadImages(true);
         });
 
         document.getElementById('confirmDownload').addEventListener('click', downloadImage);
         document.getElementById('cancelDownload').addEventListener('click', closeDownloadModal);
 
-        // Close modal on background click
         document.getElementById('downloadModal').addEventListener('click', (e) => {
             if (e.target.id === 'downloadModal') {
                 closeDownloadModal();
@@ -352,7 +460,6 @@
         });
 
         // Initialize
-        loadImages();
+        loadImages(false);
     </script>
-
 </x-app-layout>

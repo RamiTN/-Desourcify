@@ -225,7 +225,7 @@ async function loadCategoryImages(category) {
     const images = [];
     
     try {
-        const res = await fetch(`/api/pexels/${encodeURIComponent(category)}`);
+        const res = await fetch(`/pexels/${encodeURIComponent(category)}`);
         if (res.ok) {
             const data = await res.json();
             if (data.photos && Array.isArray(data.photos)) {
@@ -237,7 +237,7 @@ async function loadCategoryImages(category) {
     }
     
     try {
-        const res = await fetch(`/api/pixabay/${encodeURIComponent(category)}`);
+        const res = await fetch(`/pixabay/${encodeURIComponent(category)}`);
         if (res.ok) {
             const data = await res.json();
             if (data.hits && Array.isArray(data.hits)) {
