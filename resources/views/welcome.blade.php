@@ -6,7 +6,7 @@
             @else
                 <a href="{{ route('login') }}" class="text-blue-600 hover:underline">Login</a>
                 @if (Route::has('register'))
-                    <a href="{{ route('register') }}" class="text-blue-600 hover:underline">Logout</a>
+                    <a href="{{ route('register') }}" class="text-blue-600 hover:underline">Sign Up</a>
                 @endif
             @endauth
         @endif
