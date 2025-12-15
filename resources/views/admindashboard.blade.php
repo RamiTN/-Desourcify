@@ -40,16 +40,17 @@
 
                     {{-- Additional Options --}}
                     <div class="p-4 bg-gray-100 rounded shadow hover:bg-gray-200 cursor-pointer">
-                        <h3 class="font-semibold text-lg">Pexels API Control</h3>
-                        <p class="text-gray-600 text-sm">Manage categories, API keys, and image limits.</p>
+                        <h3 class="font-semibold text-lg">Preview</h3>
+                        <p class="text-gray-600 text-sm">View as avrage user.</p>
                         <a href="{{ route('admin.pexels') }}" class="text-blue-600 hover:underline mt-2 inline-block">Go</a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <footer class="text-center py-4 flex justify-center">
-        <p>&copy; 2025 Desourcify. All rights reserved.</p>
+<hr>
+    <footer class="text-center py-4 bg-gray-100 mt-8">
+        <p class="text-gray-600">&copy; 2025 Desourcify. All rights reserved.</p>
+        <p class="text-gray-600">Made by<a class="text-blue-500" href="https://rami.page.gd/" target="_blank"> Rami Abbassi</a></p>
     </footer>
 </x-app-layout>

@@ -9,12 +9,12 @@
             <div class="grid md:grid-cols-2 gap-6">
                 <div>
                     <label for="name" class="block font-medium text-gray-700">Your Name</label>
-                    <input type="text" name="name" id="name" required 
+                    <input type="text" name="name" id="name" required placeholder="Enter your name"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
                 <div>
                     <label for="email" class="block font-medium text-gray-700">Your Email</label>
-                    <input type="email" name="email" id="email" required
+                    <input type="email" name="email" id="email" required placeholder="Enter your email"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
             </div>
@@ -22,14 +22,14 @@
             <!-- Subject -->
             <div>
                 <label for="subject" class="block font-medium text-gray-700">Subject</label>
-                <input type="text" name="subject" id="subject" required
+                <input type="text" name="subject" id="subject" required placeholder="Subject of your message"
                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
             </div>
 
             <!-- Message -->
             <div>
                 <label for="message" class="block font-medium text-gray-700">Message</label>
-                <textarea name="message" id="message" rows="6" required
+                <textarea name="message" id="message" rows="6" required placeholder="type your message here"
                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                           placeholder="Write your message here..."></textarea>
             </div>

@@ -28,8 +28,9 @@
 
     <hr class="my-10 border-gray-300">
 
-    <footer class="flex justify-center py-6 text-gray-500">
-        &copy; 2025 Desourcify. All rights reserved.
+    <footer class="text-center py-4 bg-gray-100 mt-8">
+        <p class="text-gray-600">&copy; 2025 Desourcify. All rights reserved.</p>
+        <p class="text-gray-600">Made by<a class="text-blue-500" href="https://rami.page.gd/"> Rami Abbassi</a></p>
     </footer>
 
 </x-guest-layout>

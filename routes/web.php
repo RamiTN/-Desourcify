@@ -1,11 +1,11 @@
 <?php
-
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use App\Models\User;
 
 /*
 |--------------------------------------------------------------------------
@@ -13,147 +13,237 @@ use Illuminate\Support\Facades\Storage;
 |--------------------------------------------------------------------------
 */
 
-// Public pages
-Route::get('/', function () {
-    return view('welcome');
-});
+// ============================================================================
+// PUBLIC ROUTES
+// ============================================================================
 
-Route::get('/about', function () {
-    return view('about');
-})->name('about');
+Route::view('/', 'welcome')->name('home');
+Route::view('/about', 'about')->name('about');
+Route::view('/templates', 'templates')->name('templates');
 
-Route::get('/templates', function () {
-    return view('templates');
-})->name('templates');
+// ============================================================================
+// AUTHENTICATED ROUTES
+// ============================================================================
 
-// Protected routes (authenticated & verified)
 Route::middleware(['auth', 'verified'])->group(function () {
-
-    // Dashboard route (redirect admin users)
+    
+    // Dashboard - Auto-redirect admins to admin dashboard
     Route::get('/dashboard', function () {
         $user = Auth::user();
-        if (!$user) {
-            return redirect()->route('login');
-        }
-        if ($user->is_admin) {
-            return redirect()->route('admin.dashboard');
-        }
-        return view('dashboard', ['user' => $user]);
+        return $user->is_admin
+            ? redirect()->route('admin.dashboard')
+            : view('dashboard', compact('user'));
     })->name('dashboard');
 
-    // Profile routes
+    // Profile Management
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Credits page
-    Route::get('/credit', function () {
-        return view('credit');
-    })->name('credits');
+    // Credits & Contact Pages
+    Route::view('/credit', 'credit')->name('credits');
+    Route::view('/contact', 'contact')->name('contact');
 
-    // Contact page
-    Route::get('/contact', function () {
-        return view('contact');
-    })->name('contact');
-
-    // Protected image download route
+    // Image Download (requires credits)
     Route::post('/api/download-image', function (Request $request) {
         $user = $request->user();
-
+        
+        // Validate incoming data
         $request->validate([
-            'image_url' => 'required|url',
-            'photographer'=> 'required|string|max:255',
-            'photo_id' => 'required|string|max:50'
+            'image_url'    => 'required|url',
+            'photographer' => 'required|string|max:255',
+            'photo_id'     => 'required|string|max:50',
         ]);
 
-        if ($user->credits <= 0) {
-            return response()->json(['error' => 'Insufficient credits. Please purchase more credits.'], 403);
-        }
-
-        try {
-            // Fetch image from remote
-            $response = Http::get($request->image_url);
-            if (!$response->ok()) {
-                return response()->json(['error' => 'Failed to fetch image'], 400);
-            }
-
-            // Save temporarily in public storage
-            $filename = 'downloads/' . $request->photo_id . '.jpg';
-            Storage::disk('public')->put($filename, $response->body());
-
-            // Deduct credit
-            $user->decrement('credits');
-
-            // Return download URL
-            $downloadUrl = Storage::url($filename);
-
+        // Check if user has enough credits
+        if ($user->credits < 1) {
             return response()->json([
-                'success' => true,
-                'remaining_credits' => $user->credits,
-                'download_url' => $downloadUrl
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Error downloading image: ' . $e->getMessage()], 500);
+                'error' => 'Insufficient credits'
+            ], 403);
         }
 
-    })->middleware('auth');
+        // Fetch the image
+        $response = Http::get($request->image_url);
+        if (!$response->ok()) {
+            return response()->json(['error' => 'Image fetch failed'], 400);
+        }
 
+        // Store the image
+        $path = 'downloads/' . $request->photo_id . '.jpg';
+        Storage::disk('public')->put($path, $response->body());
+
+        // Deduct credit
+        $user->decrement('credits');
+
+        return response()->json([
+            'success' => true,
+            'remaining_credits' => $user->credits,
+            'download_url' => Storage::url($path),
+        ]);
+    })->name('download.image');
 });
 
-// Admin routes
-Route::middleware(['auth', 'admin'])->group(function () {
-    Route::get('/admin', function () {
+// ============================================================================
+// ADMIN ROUTES
+// ============================================================================
+
+Route::middleware(['auth', 'verified'])->prefix('admin')->group(function () {
+    
+    // Admin Dashboard
+    Route::get('/', function () {
+        $user = Auth::user();
+        
+        if (!$user->is_admin) {
+            abort(403, 'Unauthorized access to admin area.');
+        }
+        
         return view('admindashboard');
     })->name('admin.dashboard');
+    
+    // Manage Users
+    Route::get('/users', function () {
+        $user = Auth::user();
+        
+        if (!$user->is_admin) {
+            abort(403, 'Unauthorized access.');
+        }
+        
+        $users = User::orderBy('created_at', 'desc')->paginate(20);
+        
+        return view('admin.users', compact('users'));
+    })->name('admin.users');
+    
+    // View Statistics
+    Route::get('/stats', function () {
+        $user = Auth::user();
+        
+        if (!$user->is_admin) {
+            abort(403, 'Unauthorized access.');
+        }
+        
+        $stats = [
+            'total_users' => User::count(),
+            'admin_users' => User::where('is_admin', true)->count(),
+            'total_credits' => User::sum('credits'),
+            'recent_users' => User::orderBy('created_at', 'desc')->limit(5)->get(),
+        ];
+        
+        return view('admin.stats', compact('stats'));
+    })->name('admin.stats');
+    
+    // Manage Credits
+    Route::get('/credits', function () {
+        $user = Auth::user();
+        
+        if (!$user->is_admin) {
+            abort(403, 'Unauthorized access.');
+        }
+        
+        $users = User::orderBy('credits', 'desc')->paginate(20);
+        
+        return view('admin.credits', compact('users'));
+    })->name('admin.credits');
+    
+    // Update User Credits
+    Route::post('/credits/update', function (Request $request) {
+        $user = Auth::user();
+        
+        if (!$user->is_admin) {
+            abort(403, 'Unauthorized access.');
+        }
+        
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'credits' => 'required|integer|min:0',
+        ]);
+        
+        $targetUser = User::findOrFail($request->user_id);
+        $targetUser->update(['credits' => $request->credits]);
+        
+        return redirect()->back()->with('success', 'Credits updated successfully!');
+    })->name('admin.credits.update');
+    
+    // Pexels API Control
+    Route::get('/pexels', function () {
+        $user = Auth::user();
+        
+        if (!$user->is_admin) {
+            abort(403, 'Unauthorized access.');
+        }
+        
+        $apiConfig = [
+            'pexels_key' => config('services.pexels.key') ? '***' . substr(config('services.pexels.key'), -4) : 'Not Set',
+            'pixabay_key' => config('services.pixabay.key') ? '***' . substr(config('services.pixabay.key'), -4) : 'Not Set',
+        ];
+        
+        return view('admin.pexels', compact('apiConfig'));
+    })->name('admin.pexels');
+    
+    // Delete User
+    Route::delete('/users/{id}', function ($id) {
+        $user = Auth::user();
+        
+        if (!$user->is_admin) {
+            abort(403, 'Unauthorized access.');
+        }
+        
+        $targetUser = User::findOrFail($id);
+        
+        // Prevent deleting yourself
+        if ($targetUser->id === $user->id) {
+            return redirect()->back()->with('error', 'You cannot delete your own account from here!');
+        }
+        
+        $targetUser->delete();
+        
+        return redirect()->back()->with('success', 'User deleted successfully!');
+    })->name('admin.users.delete');
 });
 
-// API routes (public proxies for Pexels & Pixabay)
-// API routes (public proxies for Pexels & Pixabay)
+// ============================================================================
+// PUBLIC API PROXIES (Rate Limited)
+// ============================================================================
+
+// Pexels API Proxy
 Route::get('/pexels/{query?}', function ($query = 'nature') {
-    $apiKey = env('PEXELS_API_KEY');
-    if (!$apiKey) return response()->json(['error' => 'API key not configured'], 500);
-
+    $key = env('PEXELS_API_KEY');
+    
+    if (!$key) {
+        return response()->json(['error' => 'PEXELS API key missing'], 500);
+    }
+    
+    // Sanitize query
     $query = preg_replace('/[^a-zA-Z0-9\s-]/', '', $query);
-
-    $response = Http::withHeaders(['Authorization' => $apiKey])
-        ->get("https://api.pexels.com/v1/search", [  // ← Fixed: added /search
-            'query' => $query,
-            'per_page' => 6
-        ]);
-
-    if ($response->successful()) return $response->json();
-
-    return response()->json([
-        'error' => 'Failed to fetch images from Pexels', 
-        'status' => $response->status()
-    ], 500);
+    
+    return Http::withHeaders([
+        'Authorization' => $key
+    ])->get('https://api.pexels.com/v1/search', [
+        'query' => $query,
+        'per_page' => 6,
+    ])->json();
 })->middleware('throttle:60,1');
 
+// Pixabay API Proxy
 Route::get('/pixabay/{query?}', function ($query = 'nature') {
-    $apiKey = env('PIXABAY_API_KEY');
-    if (!$apiKey) return response()->json(['error' => 'Pixabay API key not configured'], 500);
-
+    $key = env('PIXABAY_API_KEY');
+    
+    if (!$key) {
+        return response()->json(['error' => 'PIXABAY API key missing'], 500);
+    }
+    
+    // Sanitize query
     $query = preg_replace('/[^a-zA-Z0-9\s-]/', '', $query);
-
-    $response = Http::get("https://pixabay.com/api/", [  // ← Fixed: removed /docs/
-        'key' => $apiKey,
+    
+    return Http::get('https://pixabay.com/api/', [
+        'key' => $key,
         'q' => $query,
         'image_type' => 'photo',
         'per_page' => 6,
-        'safesearch' => true
-    ]);
-
-    if ($response->successful()) return $response->json();
-
-    return response()->json([
-        'error' => 'Failed to fetch images from Pixabay', 
-        'status' => $response->status()
-    ], 500);
+    ])->json();
 })->middleware('throttle:60,1');
 
+// ============================================================================
+// AUTH ROUTES (Login, Register, Password Reset, etc.)
+// ============================================================================
+
 require __DIR__.'/auth.php';
-
-
-
-

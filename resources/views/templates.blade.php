@@ -86,7 +86,10 @@
             </div>
         </div>
     </div>
-
+    <footer class="text-center py-4 bg-gray-100 mt-8">
+        <p class="text-gray-600">&copy; 2025 Desourcify. All rights reserved.</p>
+        <p class="text-gray-600">Made by<a class="text-blue-500" href="https://rami.page.gd/"> Rami Abbassi</a></p>
+    </footer>
     <script>
         let currentPage = 1;
         let isLoading = false;
