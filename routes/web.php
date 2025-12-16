@@ -19,7 +19,9 @@ use App\Models\User;
 
 Route::view('/', 'welcome')->name('home');
 Route::view('/about', 'about')->name('about');
+Route::view('/terms', 'terms')->name('terms');
 Route::view('/templates', 'templates')->name('templates');
+Route::view('/video', 'video')->name('video');
 
 // ============================================================================
 // AUTHENTICATED ROUTES
@@ -223,8 +225,52 @@ Route::get('/pexels/{query?}', function ($query = 'nature') {
     ])->json();
 })->middleware('throttle:60,1');
 
+//pexels video API Proxy
+// ===============================
+Route::get('/pexels/video/{query?}', function ($query = 'nature') {
+    $key = env('PEXELS_API_KEY');
+
+    if (!$key) {
+        return response()->json(['error' => 'PEXELS API key missing'], 500);
+    }
+
+    // Sanitize query
+    $query = preg_replace('/[^a-zA-Z0-9\s-]/', '', $query);
+
+    $response = Http::withHeaders([
+        'Authorization' => $key
+    ])->get('https://api.pexels.com/videos/search', [
+        'query' => $query,
+        'per_page' => 6,
+    ]);
+
+    return $response->json();
+})->middleware('throttle:60,1');
+
+// ===============================
+// VIDEO DOWNLOAD (requires credits)
+// ===============================
+Route::middleware(['auth'])->post('/api/download-video', function (Request $request) {
+    $user = $request->user();
+    $usedCredits = 3; // Cost per video
+
+    if ($user->credits < $usedCredits) {
+        return response()->json(['error' => 'Insufficient credits'], 403);
+    }
+
+    // Subtract credits
+    $user->decrement('credits', $usedCredits);
+
+    // You can optionally log download info here
+
+    return response()->json([
+        'success' => true,
+        'remaining_credits' => $user->credits
+    ]);
+})->name('download.video');
+
 // Pixabay API Proxy
-Route::get('/pixabay/{query?}', function ($query = 'nature') {
+Route::get('/pixabay/{query?}', function ($query = null) {
     $key = env('PIXABAY_API_KEY');
     
     if (!$key) {

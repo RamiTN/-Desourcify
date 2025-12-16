@@ -20,8 +20,10 @@
                 <p class="mt-2 text-gray-700">
                     You have <strong id="credits-display">{{ auth()->user()->credits }}</strong> credits left.
                 </p>
+<div class="flex justify-between">
                 <p class="text-sm text-gray-500 mt-1">Each download costs 1 credit</p>
-                
+                <p><a class="text-blue-500 underline" href="{{ route('video') }}" target="_blank">need videos? browse from here -></a></p>
+                </div>
                 <div class="mt-6" id="media-container">
                     <div class="flex items-center justify-center py-8">
                         <svg class="animate-spin h-8 w-8 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
