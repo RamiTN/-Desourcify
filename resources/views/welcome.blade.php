@@ -7,20 +7,21 @@
             <div class="w-10 h-10 bg-gradient-to-br from-blue-400 via-purple-400 to-green-400 rounded-lg"></div>
             <span class="text-xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-green-600 bg-clip-text text-transparent">Desourcify</span>
         </div>
-        @if (Route::has('login'))
-            <div class="flex gap-4 items-center">
+        <br>
+        <div class="flex gap-4 items-center">
+            @if (Route::has('login'))
                 @auth
-                    <a href="{{ url('/dashboard') }}" class="px-6 py-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium hover:shadow-lg transition-all duration-300 hover:scale-105">Dashboard</a>
+                    <a href="{{ url('/dashboard') }}" class="px-6 py-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-blue font-medium hover:shadow-lg transition-all duration-300 hover:scale-105">Continue</a>
                 @else
-                    <a href="{{ route('login') }}" class="px-6 py-2 text-gray-700 font-medium hover:text-blue-600 transition-colors">Login</a>
+                    <a href="{{ route('login') }}" class="px-6 py-2 text-gray-700 font-medium hover:text-blue-600 transition-colors">Log In</a>
                     @if (Route::has('register'))
-                        <button type="button" id="signup-btn" class="px-6 py-2 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 text-white font-medium hover:shadow-xl transition-all duration-300 hover:scale-105">
+                        <button type="button" id="signup-btn" class="px-6 py-2 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 text-gray-300 font-medium hover:shadow-xl transition-all duration-300 hover:scale-105">
                             Sign Up
                         </button>
                     @endif
                 @endauth
-            </div>
-        @endif
+            @endif
+        </div>
     </nav>
 
     <!-- Modal -->
@@ -45,7 +46,7 @@
                 <button type="button" id="cancel-btn" class="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-300 font-medium">
                     Cancel
                 </button>
-                <button type="button" id="accept-signup-btn" class="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 text-white rounded-xl hover:shadow-xl transition-all duration-300 font-medium hover:scale-105">
+                <button type="button" id="accept-signup-btn" class="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 text-500-blue rounded-xl hover:shadow-xl transition-all duration-300 font-medium hover:scale-105">
                     Continue
                 </button>
             </div>
@@ -55,7 +56,7 @@
     <!-- Hero Section -->
     <main class="text-center py-16 px-4">
         <div class="max-w-4xl mx-auto">
-            <h1 class="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-blue-600 via-purple-600 to-green-600 bg-clip-text text-transparent animate-gradient">
+            <h1 class="text-5xl md:text-6xl text-center font-bold mb-6 bg-gradient-to-r from-blue-600 via-purple-600 to-green-600 bg-clip-text text-transparent animate-gradient">
                 Welcome to Desourcify
             </h1>
             <a href="{{ route('about') }}" class="inline-block group">
@@ -117,8 +118,25 @@
     }
     
     .animate-gradient {
-        background-size: 200% 200%;
-        animation: gradient 3s ease infinite;
+        background-size: 200% 200% !important;
+        animation: gradient 3s ease infinite !important;
+        background-image: linear-gradient(to right, #2563eb, #9333ea, #059669) !important;
+        -webkit-background-clip: text !important;
+        background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        color: transparent !important;
+    }
+    
+    main h1 {
+        font-size: 3rem !important;
+        font-weight: 700 !important;
+        margin-bottom: 1.5rem !important;
+    }
+    
+    @media (min-width: 768px) {
+        main h1 {
+            font-size: 3.75rem !important;
+        }
     }
     
     #terms-modal:not(.hidden) #modal-content {
