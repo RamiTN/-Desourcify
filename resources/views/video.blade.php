@@ -167,6 +167,7 @@
         let isLoading = false;
         let selectedVideo = null;
         let currentVideos = [];
+        const PIXABAY_API_KEY = 'qSGU1JPjVWDhGFWoAS8nM1ELauoQFhDMvLhnDSKV';
 
         const categoryMap = {
             'nature': 'nature',
@@ -238,48 +239,89 @@
                     `;
                 }
 
+                let videos = [];
                 let category = checkedCategories.length > 0 
                     ? categoryMap[checkedCategories[0]] || checkedCategories[0]
                     : 'nature';
 
                 const searchQuery = searchTerm || category;
 
-                const pexelsUrl = `/pexels/video/${encodeURIComponent(searchQuery)}?page=${currentPage}`;
-
-                const pexelsRes = await fetch(pexelsUrl);
-                
-                if (pexelsRes.ok) {
-                    const pexelsData = await pexelsRes.json();
-                    let videos = [];
-                    if (pexelsData.videos && Array.isArray(pexelsData.videos)) {
-                        videos = pexelsData.videos.map(video => {
-                            const videoFile = video.video_files.find(f => f.quality === 'hd') || video.video_files[0];
-                            return {
-                                id: video.id,
-                                videographer: video.user.name,
-                                videographerUrl: video.user.url,
-                                videoUrl: videoFile.link,
-                                image: video.image,
-                                duration: video.duration,
-                                width: video.width,
-                                height: video.height,
-                                category: searchQuery,
-                                source: 'pexels',
-                                video_files: video.video_files
-                            };
-                        });
+                // Load from Pexels
+                try {
+                    const pexelsUrl = `/pexels/video/${encodeURIComponent(searchQuery)}?page=${currentPage}`;
+                    const pexelsRes = await fetch(pexelsUrl);
+                    
+                    if (pexelsRes.ok) {
+                        const pexelsData = await pexelsRes.json();
+                        if (pexelsData.videos && Array.isArray(pexelsData.videos)) {
+                            videos.push(...pexelsData.videos.map(video => {
+                                const videoFile = video.video_files.find(f => f.quality === 'hd') || video.video_files[0];
+                                return {
+                                    id: video.id,
+                                    videographer: video.user.name,
+                                    videographerUrl: video.user.url,
+                                    videoUrl: videoFile.link,
+                                    image: video.image,
+                                    duration: video.duration,
+                                    width: video.width,
+                                    height: video.height,
+                                    category: searchQuery,
+                                    source: 'pexels',
+                                    video_files: video.video_files
+                                };
+                            }));
+                        }
                     }
-
-                    if (append) currentVideos = [...currentVideos, ...videos];
-                    else currentVideos = videos;
-
-                    displayVideos(videos, append);
-                } else {
-                    showToast('Failed to load videos from Pexels', 'error');
+                } catch (err) {
+                    console.error('Pexels error:', err);
                 }
+
+                // Load from Pixabay
+                try {
+                    const pixabayUrl = `https://pixabay.com/api/videos/?key=${PIXABAY_API_KEY}&q=${encodeURIComponent(searchQuery)}&page=${currentPage}&per_page=20`;
+                    const pixabayRes = await fetch(pixabayUrl);
+                    
+                    if (pixabayRes.ok) {
+                        const pixabayData = await pixabayRes.json();
+                        if (pixabayData.hits && Array.isArray(pixabayData.hits)) {
+                            videos.push(...pixabayData.hits.map(video => {
+                                const videoFile = video.videos.large || video.videos.medium || video.videos.small;
+                                return {
+                                    id: video.id,
+                                    videographer: video.user,
+                                    videographerUrl: `https://pixabay.com/users/${video.user}-${video.user_id}/`,
+                                    videoUrl: videoFile.url,
+                                    image: video.userImageURL || 'https://via.placeholder.com/640x360?text=Video',
+                                    duration: video.duration,
+                                    width: videoFile.width,
+                                    height: videoFile.height,
+                                    category: searchQuery,
+                                    source: 'pixabay',
+                                    video_files: [{ link: videoFile.url, quality: videoFile.quality }]
+                                };
+                            }));
+                        }
+                    }
+                } catch (err) {
+                    console.error('Pixabay error:', err);
+                }
+
+                // Randomize and limit
+                videos = videos.sort(() => Math.random() - 0.5).slice(0, 20);
+
+                if (append) currentVideos = [...currentVideos, ...videos];
+                else currentVideos = videos;
+
+                displayVideos(videos, append);
+
             } catch (error) {
                 console.error(error);
                 showToast('Error loading videos', 'error');
+                document.getElementById('media-container').innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <p class="text-red-500 text-lg font-bold">Error loading videos</p>
+                    </div>
+                `;
             } finally {
                 isLoading = false;
             }
@@ -298,12 +340,14 @@
 
             let html = '';
             videos.forEach(video => {
+                const sourceColor = video.source === 'pexels' ? 'from-purple-100 to-purple-200 text-purple-700' : 'from-emerald-100 to-emerald-200 text-emerald-700';
                 const videoData = {
                     id: video.id,
                     videoUrl: video.videoUrl,
                     videographer: video.videographer,
                     duration: video.duration,
-                    video_files: video.video_files
+                    video_files: video.video_files,
+                    source: video.source
                 };
                 html += `
                     <div class="rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-2 bg-white border-2 border-gray-100 group" 
@@ -329,7 +373,7 @@
                             </p>
                             <div class="flex gap-2 mt-3">
                                 <span class="inline-block px-3 py-1 bg-gradient-to-r from-cyan-100 to-cyan-200 text-cyan-700 text-xs rounded-full font-semibold">${video.category}</span>
-                                <span class="inline-block px-3 py-1 bg-gradient-to-r from-purple-100 to-purple-200 text-purple-700 text-xs rounded-full font-semibold">Pexels</span>
+                                <span class="inline-block px-3 py-1 bg-gradient-to-r ${sourceColor} text-xs rounded-full capitalize font-semibold">${video.source}</span>
                             </div>
                         </div>
                     </div>
@@ -343,7 +387,7 @@
 
         function handleVideoClick(element) {
             const videoData = JSON.parse(element.getAttribute('data-video'));
-            openDownloadModal(videoData.id, videoData.videoUrl, videoData.videographer, videoData.duration, videoData.video_files);
+            openDownloadModal(videoData.id, videoData.videoUrl, videoData.videographer, videoData.duration, videoData.video_files, videoData.source);
         }
 
         function updateResultsCount(count) {
@@ -369,8 +413,8 @@
             searchTimeout = setTimeout(applyFilters, 500);
         }
 
-        function openDownloadModal(videoId, videoUrl, videographer, duration, videoFiles) {
-            selectedVideo = { id: videoId, videoUrl, videographer, duration, video_files: videoFiles };
+        function openDownloadModal(videoId, videoUrl, videographer, duration, videoFiles, source) {
+            selectedVideo = { id: videoId, videoUrl, videographer, duration, video_files: videoFiles, source };
             const modalVideo = document.getElementById('modalVideo');
             modalVideo.src = videoUrl;
             modalVideo.load();
@@ -415,10 +459,10 @@
                     body: JSON.stringify({ used_credits: 3 })
                 });
 
-                // Download directly from Pexels
+                // Download video
                 const link = document.createElement('a');
                 link.href = selectedVideo.videoUrl;
-                link.download = `pexels-${selectedVideo.videographer}-${selectedVideo.id}.mp4`;
+                link.download = `${selectedVideo.source}-${selectedVideo.videographer}-${selectedVideo.id}.mp4`;
                 link.target = '_blank';
                 document.body.appendChild(link);
                 link.click();

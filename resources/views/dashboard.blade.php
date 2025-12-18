@@ -163,7 +163,7 @@ function openDownloadModal(photo, source) {
     const modalImage = document.getElementById('modal-image');
     const modalPhotographer = document.getElementById('modal-photographer');
 
-    modalImage.src = source === 'pexels' ? photo.src.large : photo.largeImageURL;
+    modalImage.src = source === 'pexels' ? photo.src.large : photo.webformatURL;
     modalPhotographer.textContent = source === 'pexels' ? photo.photographer : photo.user;
 
     downloadModal.classList.remove('hidden');
